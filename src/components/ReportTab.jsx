@@ -12,6 +12,9 @@ import {
   Download,
   ChevronDown,
   Loader2,
+  Volume2,
+  VolumeX,
+  CheckCircle2,
 } from "lucide-react";
 import {
   STATES,
@@ -23,6 +26,41 @@ import {
 } from "../data/mockData";
 
 const CAPITAL_CHIPS = [25000, 50000, 100000, 250000];
+
+const LANG_CONFIG = {
+  English: {
+    code: "en-IN",
+    bannerTitle: "Listen to Full Report",
+    bannerPlaying: "Playing Audio Report...",
+    bannerSub: "Understand the full business analysis and margins in your selected language.",
+    viableTag: "Viable Business",
+    btnListen: "Listen",
+  },
+  "हिन्दी": {
+    code: "hi-IN",
+    bannerTitle: "पूरी रिपोर्ट आवाज़ में सुनें",
+    bannerPlaying: "रिपोर्ट आवाज़ में सुनी जा रही है...",
+    bannerSub: "बिना पढ़े पूरा व्यापार विश्लेषण और मुनाफा अपनी मातृभाषा में समझें।",
+    viableTag: "व्यवसाय अनुशंसित",
+    btnListen: "सुनें",
+  },
+  "मराठी": {
+    code: "mr-IN",
+    bannerTitle: "पूर्ण अहवाल आवाजात ऐका",
+    bannerPlaying: "अहवाल आवाजात ऐकला जात आहे...",
+    bannerSub: "वाचल्याशिवाय संपूर्ण व्यवसाय विश्लेषण आणि नफा आपल्या भाषेत समजून घ्या.",
+    viableTag: "व्यवसाय शिफारस केलेला",
+    btnListen: "ऐका",
+  },
+  "தமிழ்": {
+    code: "ta-IN",
+    bannerTitle: "முழு அறிக்கையை குரல் வழியில் கேளுங்கள்",
+    bannerPlaying: "குரல் அறிக்கை ஒலிக்கிறது...",
+    bannerSub: "படிக்காமலேயே முழு தொழில் பகுப்பாய்வு மற்றும் லாபத்தை உங்கள் மொழியில் புரிந்து கொள்ளுங்கள்.",
+    viableTag: "பரிந்துரைக்கப்பட்ட தொழில்",
+    btnListen: "கேளுங்கள்",
+  },
+};
 
 function Select({ label, value, onChange, options, disabled, placeholder }) {
   return (
@@ -84,7 +122,7 @@ const DENSITY_STYLE = {
   Saturated: { color: "#dc2626", pct: 90 },
 };
 
-export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated }) {
+export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated, currentLang = "English" }) {
   const [state, setState] = useState("");
   const [district, setDistrict] = useState("");
   const [block, setBlock] = useState("");
@@ -93,20 +131,74 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
   const [capital, setCapital] = useState(100000);
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState(null);
+  const [playingSection, setPlayingSection] = useState(null);
 
-  // Consume prefill coming from the Business Finder Bot
+  const activeLangConfig = LANG_CONFIG[currentLang] || LANG_CONFIG.English;
+
+  const speakReport = (textGenerator, sectionKey = "full") => {
+    if (!("speechSynthesis" in window)) {
+      alert("Speech synthesis is not supported in this browser.");
+      return;
+    }
+
+    if (playingSection === sectionKey) {
+      window.speechSynthesis.cancel();
+      setPlayingSection(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const textToSpeak = typeof textGenerator === "function" ? textGenerator(currentLang) : textGenerator;
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = activeLangConfig.code;
+    utterance.rate = 0.9;
+
+    utterance.onstart = () => setPlayingSection(sectionKey);
+    utterance.onend = () => setPlayingSection(null);
+    utterance.onerror = () => setPlayingSection(null);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
   useEffect(() => {
     if (prefill) {
-      setSectorId(prefill.sectorId);
-      setCapital(prefill.capital);
+      let mappedSector = prefill.sectorId || prefill.sector || "";
+      
+      if (mappedSector) {
+        const lowerSector = mappedSector.toLowerCase();
+        if (lowerSector.includes("dairy") || lowerSector.includes("दूध")) mappedSector = "dairy";
+        else if (lowerSector.includes("tailor") || lowerSector.includes("garment") || lowerSector.includes("कपड़ा") || lowerSector.includes("सिलाई")) mappedSector = "textiles";
+        else if (lowerSector.includes("food") || lowerSector.includes("agro") || lowerSector.includes("चक्की")) mappedSector = "agro_processing";
+        else if (lowerSector.includes("retail") || lowerSector.includes("kirana") || lowerSector.includes("दुकान")) mappedSector = "retail";
+        else if (lowerSector.includes("bamboo") || lowerSector.includes("handicraft")) mappedSector = "handicrafts";
+      }
+
+      if (mappedSector) {
+        setSectorId(mappedSector);
+      }
+
+      const assignedCapital = prefill.capital || prefill.marginCapital;
+      if (assignedCapital) {
+        setCapital(Number(assignedCapital));
+      }
+
       if (!state) {
         setState("Maharashtra");
         setDistrict("Pune");
         setBlock("Haveli");
         setPanchayat("Wagholi");
       }
-      onConsumePrefill();
-      setTimeout(() => generate({ overrideSector: prefill.sectorId, overrideCapital: prefill.capital }), 50);
+
+      if (onConsumePrefill) {
+        onConsumePrefill();
+      }
+
+      setTimeout(() => {
+        generate({
+          overrideSector: mappedSector || sectorId,
+          overrideCapital: assignedCapital || capital,
+        });
+      }, 50);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
@@ -141,6 +233,27 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
   };
 
   const canGenerate = state && district && block && panchayat && sectorId && capital > 0;
+
+  // Localized narrative generators
+  const getFullSummaryText = (lang) => {
+    const p = report.meta.panchayat;
+    const s = report.meta.sector.name;
+    const score = report.opportunityGap.demandGapScore;
+    const comp = report.competitorDensity.level;
+    const price = report.pricing.recommendedPrice;
+    const margin = report.pricing.estMonthlyMargin.toLocaleString("en-IN");
+
+    if (lang === "मराठी") {
+      return `अहवाल सारांश: ग्रामपंचायत ${p} मध्ये ${s} व्यवसायासाठी मागणी स्कोअर ${score} टक्के आहे. स्थानिक स्पर्धा ${comp} पातळीवर आहे. शिफारस केलेले विक्री मूल्य ₹${price} प्रति युनिट आहे आणि अंदाजे मासिक निव्वळ नफा ₹${margin} होईल. हा व्यवसाय सरकारी सवलतीच्या कर्ज योजनेसाठी योग्य आहे.`;
+    }
+    if (lang === "हिन्दी") {
+      return `रिपोर्ट सारांश: ग्राम पंचायत ${p} में ${s} व्यवसाय के लिए मांग स्कोर ${score} प्रतिशत है। प्रतिस्पर्धा स्तर ${comp} है। अनुशंसित विक्रय मूल्य ₹${price} प्रति इकाई है और अनुमानित मासिक शुद्ध लाभ ₹${margin} होगा। यह व्यवसाय सरकारी रियायती ऋण योजना के लिए उपयुक्त है।`;
+    }
+    if (lang === "தமிழ்") {
+      return `அறிக்கை சுருக்கம்: ${p} பஞ்சாயத்தில் ${s} தொழிலுக்கான தேவை மதிப்பெண் ${score} சதவீதம். பரிந்துரைக்கப்பட்ட விலை ₹${price}, மாத நிகர லாபம் சுமார் ₹${margin} ஆகும்.`;
+    }
+    return `Feasibility Summary: In ${p}, the demand score for ${s} is ${score} percent with ${comp} competition. Recommended price is ₹${price} per unit with an estimated monthly net profit of ₹${margin}. This enterprise is viable for concessional credit.`;
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -261,9 +374,38 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
       {/* REPORT OUTPUT */}
       {report && (
         <div className="space-y-6">
+          {/* Audio Narration Hero Card */}
+          <div className="rounded-2xl bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 text-white p-5 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 border border-emerald-500/30">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => speakReport(getFullSummaryText, "full")}
+                className={`h-14 w-14 rounded-full flex items-center justify-center shadow-xl transition-all transform active:scale-95 shrink-0 ${
+                  playingSection === "full" ? "bg-rose-500 animate-pulse text-white" : "bg-amber-400 text-slate-950 hover:bg-amber-300"
+                }`}
+              >
+                {playingSection === "full" ? <VolumeX className="h-7 w-7" /> : <Volume2 className="h-7 w-7" />}
+              </button>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold flex items-center gap-2">
+                  {playingSection === "full" ? activeLangConfig.bannerPlaying : activeLangConfig.bannerTitle}
+                </h3>
+                <p className="text-xs text-emerald-200 mt-0.5">
+                  {activeLangConfig.bannerSub}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                {activeLangConfig.viableTag}
+              </span>
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-3">
             <p className="text-sm text-emerald-800 flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
+              <MapPin className="h-4 w-4 shrink-0" />
               Report for <span className="font-bold">{report.meta.sector.name}</span> in{" "}
               <span className="font-bold">
                 {report.meta.panchayat}, {report.meta.block}, {report.meta.district}
@@ -279,7 +421,23 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
 
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Pillar 1: Market Reach */}
-            <PillarCard icon={<Users className="h-4 w-4" />} title="1 · Market Reach" color="emerald">
+            <PillarCard
+              icon={<Users className="h-4 w-4" />}
+              title="1 · Market Reach"
+              color="emerald"
+              onAudioClick={() =>
+                speakReport(
+                  (l) =>
+                    l === "मराठी"
+                      ? `मार्केट पोहोच: तुमच्या परिसरातील ${report.marketReach.radiusKm} किलोमीटर क्षेत्रात अंदाजे ${report.marketReach.population.toLocaleString("en-IN")} लोकसंख्या आहे आणि साप्ताहिक खरेदी क्षमता ₹${report.marketReach.catchmentBuyingPower.toLocaleString("en-IN")} आहे.`
+                      : l === "हिन्दी"
+                      ? `मार्केट रीच: आपके क्षेत्र के ${report.marketReach.radiusKm} किलोमीटर दायरे में लगभग ${report.marketReach.population.toLocaleString("en-IN")} लोग रहते हैं और साप्ताहिक खरीद क्षमता ₹${report.marketReach.catchmentBuyingPower.toLocaleString("en-IN")} है।`
+                      : `Market Reach: Population in ${report.marketReach.radiusKm} km radius is ${report.marketReach.population.toLocaleString("en-IN")} with weekly buying power of ₹${report.marketReach.catchmentBuyingPower.toLocaleString("en-IN")}.`,
+                  "reach"
+                )
+              }
+              isPlaying={playingSection === "reach"}
+            >
               <div className="flex items-center gap-6">
                 <Gauge value={Math.min(100, Math.round(report.marketReach.population / 145))} label="Catchment Index" />
                 <div className="space-y-2 text-sm flex-1">
@@ -299,7 +457,23 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
             </PillarCard>
 
             {/* Pillar 2: Opportunity & Gaps */}
-            <PillarCard icon={<TrendingUp className="h-4 w-4" />} title="2 · Opportunity & Gaps Analysis" color="indigo">
+            <PillarCard
+              icon={<TrendingUp className="h-4 w-4" />}
+              title="2 · Opportunity & Gaps Analysis"
+              color="indigo"
+              onAudioClick={() =>
+                speakReport(
+                  (l) =>
+                    l === "मराठी"
+                      ? `संधी आणि मागणी: मागणी स्कोअर ${report.opportunityGap.demandGapScore} टक्के आहे. स्थानिक पातळीवर ग्राहकांकडून चांगली मागणी आहे.`
+                      : l === "हिन्दी"
+                      ? `अवसर और मांग: मांग का स्कोर ${report.opportunityGap.demandGapScore} प्रतिशत है। ${report.opportunityGap.narrative}`
+                      : `Demand score is ${report.opportunityGap.demandGapScore} percent indicating strong local viability.`,
+                  "opportunity"
+                )
+              }
+              isPlaying={playingSection === "opportunity"}
+            >
               <div className="flex items-center gap-6">
                 <Gauge value={report.opportunityGap.demandGapScore} color="#4f46e5" label="Demand-Gap Score" />
                 <div className="flex-1">
@@ -312,7 +486,24 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
             </PillarCard>
 
             {/* Pillar 3: SWOT */}
-            <PillarCard icon={<Grid2x2 className="h-4 w-4" />} title="3 · Budget-Tailored SWOT Analysis" color="slate" full>
+            <PillarCard
+              icon={<Grid2x2 className="h-4 w-4" />}
+              title="3 · Budget-Tailored SWOT Analysis"
+              color="slate"
+              full
+              onAudioClick={() =>
+                speakReport(
+                  (l) =>
+                    l === "मराठी"
+                      ? `व्यवसाय विश्लेषण: प्रमुख ताकद म्हणजे ${report.swot.strengths[0]} आणि मोठी संधी म्हणजे ${report.swot.opportunities[0]}.`
+                      : l === "हिन्दी"
+                      ? `व्यापार विश्लेषण: मुख्य ताकत है ${report.swot.strengths[0]}। मुख्य अवसर है ${report.swot.opportunities[0]}।`
+                      : `Key strength is ${report.swot.strengths[0]} and main opportunity is ${report.swot.opportunities[0]}.`,
+                  "swot"
+                )
+              }
+              isPlaying={playingSection === "swot"}
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SwotBlock title="Strengths" items={report.swot.strengths} tone="emerald" />
                 <SwotBlock title="Weaknesses" items={report.swot.weaknesses} tone="amber" />
@@ -322,7 +513,23 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
             </PillarCard>
 
             {/* Pillar 4: Bottlenecks */}
-            <PillarCard icon={<AlertTriangle className="h-4 w-4" />} title="4 · Threats & Bottleneck Pinpointing" color="amber">
+            <PillarCard
+              icon={<AlertTriangle className="h-4 w-4" />}
+              title="4 · Threats & Bottleneck Pinpointing"
+              color="amber"
+              onAudioClick={() =>
+                speakReport(
+                  (l) =>
+                    l === "मराठी"
+                      ? `संभाव्य जोखीम: मुख्य अडचण म्हणजे ${report.bottlenecks[0]?.label}. कृपया पूर्वतयारी ठेवा.`
+                      : l === "हिन्दी"
+                      ? `संभावित जोखिम: मुख्य चुनौती ${report.bottlenecks[0]?.label} हो सकती है। कृपया अग्रिम योजना बनाएं।`
+                      : `Primary bottleneck identified is ${report.bottlenecks[0]?.label}. Advance planning recommended.`,
+                  "bottlenecks"
+                )
+              }
+              isPlaying={playingSection === "bottlenecks"}
+            >
               <div className="space-y-3">
                 {report.bottlenecks.map((b) => (
                   <div key={b.label} className="flex items-start gap-3">
@@ -344,7 +551,23 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
             </PillarCard>
 
             {/* Pillar 5: Competitor Density */}
-            <PillarCard icon={<Building2 className="h-4 w-4" />} title="5 · Competitor Density Mapping" color="rose">
+            <PillarCard
+              icon={<Building2 className="h-4 w-4" />}
+              title="5 · Competitor Density Mapping"
+              color="rose"
+              onAudioClick={() =>
+                speakReport(
+                  (l) =>
+                    l === "मराठी"
+                      ? `स्पर्धा विश्लेषण: तुमच्या ब्लॉकमध्ये स्पर्धा पातळी ${report.competitorDensity.level} आहे. अंदाजे ${report.competitorDensity.estimatedUnits} युनिट्स आधीपासून कार्यरत आहेत.`
+                      : l === "हिन्दी"
+                      ? `प्रतिस्पर्धा स्तर: आपके ब्लॉक में प्रतिस्पर्धा ${report.competitorDensity.level} है। लगभग ${report.competitorDensity.estimatedUnits} इकाइयां पहले से कार्यरत हैं।`
+                      : `Competition density is ${report.competitorDensity.level} with approximately ${report.competitorDensity.estimatedUnits} micro units active.`,
+                  "competitor"
+                )
+              }
+              isPlaying={playingSection === "competitor"}
+            >
               <div className="flex items-center gap-6">
                 <Gauge
                   value={DENSITY_STYLE[report.competitorDensity.level].pct}
@@ -361,7 +584,23 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
             </PillarCard>
 
             {/* Pillar 6: Pricing */}
-            <PillarCard icon={<Tag className="h-4 w-4" />} title="6 · Product Market Value & Pricing Strategy" color="emerald">
+            <PillarCard
+              icon={<Tag className="h-4 w-4" />}
+              title="6 · Product Market Value & Pricing Strategy"
+              color="emerald"
+              onAudioClick={() =>
+                speakReport(
+                  (l) =>
+                    l === "मराठी"
+                      ? `किंमत आणि नफा: स्थानिक सरासरी दर ₹${report.pricing.localCompetitorAvg} आहे. शिफारस केलेला दर ₹${report.pricing.recommendedPrice} आहे. महिन्याला अंदाजे ₹${report.pricing.estMonthlyMargin.toLocaleString("en-IN")} निव्वळ नफा राहील.`
+                      : l === "हिन्दी"
+                      ? `मूल्य निर्धारण और कमाई: स्थानीय औसत मूल्य ₹${report.pricing.localCompetitorAvg} है। अनुशंसित मूल्य ₹${report.pricing.recommendedPrice} है। महीने का अनुमानित शुद्ध लाभ ₹${report.pricing.estMonthlyMargin.toLocaleString("en-IN")} होगा।`
+                      : `Recommended unit price is ₹${report.pricing.recommendedPrice} with an estimated net margin of ₹${report.pricing.estMonthlyMargin.toLocaleString("en-IN")} per month.`,
+                  "pricing"
+                )
+              }
+              isPlaying={playingSection === "pricing"}
+            >
               <div className="grid grid-cols-2 gap-3">
                 <StatBox label="Local Competitor Avg" value={`₹${report.pricing.localCompetitorAvg} / ${report.pricing.unit}`} />
                 <StatBox label="Recommended Price" value={`₹${report.pricing.recommendedPrice} / ${report.pricing.unit}`} highlight />
@@ -394,7 +633,7 @@ export default function ReportTab({ prefill, onConsumePrefill, onReportGenerated
   );
 }
 
-function PillarCard({ icon, title, color, children, full }) {
+function PillarCard({ icon, title, color, children, full, onAudioClick, isPlaying }) {
   const colorMap = {
     emerald: "text-emerald-700 bg-emerald-50 border-emerald-200",
     indigo: "text-indigo-700 bg-indigo-50 border-indigo-200",
@@ -403,9 +642,23 @@ function PillarCard({ icon, title, color, children, full }) {
     rose: "text-rose-700 bg-rose-50 border-rose-200",
   };
   return (
-    <div className={`rounded-2xl bg-white border border-slate-200 shadow-sm p-5 ${full ? "lg:col-span-2" : ""}`}>
-      <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold mb-4 ${colorMap[color]}`}>
-        {icon} {title}
+    <div className={`rounded-2xl bg-white border border-slate-200 shadow-sm p-5 relative ${full ? "lg:col-span-2" : ""}`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${colorMap[color]}`}>
+          {icon} {title}
+        </div>
+        {onAudioClick && (
+          <button
+            onClick={onAudioClick}
+            className={`p-1.5 rounded-full border transition-all ${
+              isPlaying
+                ? "bg-rose-500 text-white border-rose-600 animate-pulse"
+                : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
+            }`}
+          >
+            {isPlaying ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        )}
       </div>
       {children}
     </div>

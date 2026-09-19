@@ -62,7 +62,7 @@ export default function LoginModal({ open, onClose, onLoginSuccess }) {
           >
             <X className="h-5 w-5" />
           </button>
-          <h2 className="text-lg font-bold">Sign in to GraminUdyam AI</h2>
+          <h2 className="text-lg font-bold">Sign in to FinQuest</h2>
           <p className="text-emerald-100 text-sm mt-1">National Concessional Credit Portal</p>
         </div>
 

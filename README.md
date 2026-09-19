@@ -1,6 +1,6 @@
-# GraminUdyam AI — Part 1 (MoSJE Hackathon PS-26091)
+# FinQuest — Part 1 (MoSJE Hackathon PS-26091)
 
-AI-Driven Hyper-Local Business Advisory and Financial Structuring Assistant for Rural Micro-Entrepreneurs.
+FinQuest: AI-Driven Hyper-Local Business Advisory & Financial Structuring Assistant for Rural Micro-Entrepreneurs.
 
 ## What's in Part 1
 
@@ -14,7 +14,7 @@ AI-Driven Hyper-Local Business Advisory and Financial Structuring Assistant for 
 ## Project structure
 
 ```
-graminudyam/
+finquest/
 ├── index.html
 ├── package.json
 ├── vite.config.js

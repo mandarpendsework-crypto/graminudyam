@@ -1,3 +1,4 @@
+import VoiceAssistant from './components/VoiceAssistant';
 import React, { useState } from "react";
 import { Landmark, Globe, User, ChevronDown, Home, FileBarChart2, Wallet, Handshake, Menu, X } from "lucide-react";
 import { LANGUAGES } from "./data/mockData";
@@ -30,8 +31,19 @@ export default function App() {
     setMobileNavOpen(false);
   };
 
+  const handleVoiceAutoFill = ({ capital, sector }) => {
+    if (sector || capital) {
+      goTo("report");
+      setBotPrefill((prev) => ({
+        ...prev,
+        ...(capital && { capital }),
+        ...(sector && { sector }),
+      }));
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 relative">
       {/* ============================ HEADER ============================ */}
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
         {/* Top identity strip */}
@@ -50,7 +62,7 @@ export default function App() {
                 <Landmark className="h-5 w-5 text-white" />
               </div>
               <div className="text-left">
-                <p className="font-extrabold text-slate-900 leading-tight">GraminUdyam AI</p>
+                <p className="font-extrabold text-slate-900 leading-tight">FinQuest</p>
                 <p className="text-[10px] text-slate-400 leading-tight">MoSJE Emblem · Concessional Credit Portal</p>
               </div>
             </button>
@@ -157,6 +169,7 @@ export default function App() {
             prefill={botPrefill}
             onConsumePrefill={() => setBotPrefill(null)}
             onReportGenerated={setLastReport}
+            currentLang={lang?.label || "English"}
           />
         )}
 
@@ -173,13 +186,16 @@ export default function App() {
         }}
       />
 
+      {/* ============================ VERNACULAR VOICE ASSISTANT ============================ */}
+      <VoiceAssistant onAutoFillForm={handleVoiceAutoFill} currentLang={lang?.label || "English"} />
+
       {/* ============================ LOGIN MODAL ============================ */}
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLoginSuccess={setUser} />
 
       {/* ============================ FOOTER ============================ */}
       <footer className="border-t border-slate-200 bg-white mt-10">
         <div className="max-w-6xl mx-auto px-6 py-6 text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>© {new Date().getFullYear()} GraminUdyam AI · Prototype for MoSJE Hackathon (PS-26091)</p>
+          <p>© {new Date().getFullYear()} FinQuest · Prototype for MoSJE Hackathon (PS-26091)</p>
           <p>Not a live government service · Demo data only</p>
         </div>
       </footer>

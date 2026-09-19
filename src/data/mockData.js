@@ -1,5 +1,5 @@
 // ============================================================================
-// GraminUdyam AI — Mock Data & Deterministic Calculation Engines
+// FinQuest — Mock Data & Deterministic Calculation Engines
 // MoSJE Hackathon Prototype (PS-26091)
 // ============================================================================
 
